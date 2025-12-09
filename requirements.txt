@@ -1,5 +1,0 @@
-fastapi==0.101.1
-uvicorn[standard]==0.22.0
-pytest==7.4.2
-# use a compatible httpx version available on PyPI
-httpx==0.26.0
