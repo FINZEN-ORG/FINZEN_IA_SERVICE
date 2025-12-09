@@ -25,6 +25,7 @@ class GoalInput(BaseModel):
     saved_amount: float
     category: str
     due_date: Optional[str] = None
+    status: str
 
 class AgentInput(BaseModel):
     user_id: int
@@ -32,6 +33,7 @@ class AgentInput(BaseModel):
     context: str = "friendly"  # Tono
     
     # Datos inyectados por el orquestador (no por el usuario)
+    # Datos opcionales (si el frontend ya los tiene)
     transactions: List[TransactionInput] = []
     goals: List[GoalInput] = []
     financial_context: Optional[FinancialContext] = None
@@ -44,3 +46,8 @@ class AIRecommendation(BaseModel):
     sentiment: str  # POSITIVE, WARNING, CRITICAL, INFO
     actionable_tip: Optional[str] = None
     data: Optional[Dict[str, Any]] = None # Datos extra (ej: lista de hormiga)
+
+class AgentOutput(BaseModel):
+    action: str # "FINANCIAL_ANALYSIS" | "GOAL_ADVICE"
+    message: str
+    data: Dict[str, Any] # Aquí va el JSON complejo que generan los prompts

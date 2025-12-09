@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from src.models.schemas import AgentInput, AIRecommendation, FinancialContext
+from src.models.schemas import AgentInput, AIRecommendation, AgentOutput, FinancialContext
 from src.services.transaction_service import get_user_transactions, get_financial_summary
 from src.services.goal_service import get_user_goals
-from src.agents import financial_agent, goal_agent
+from src.orchestration.graph import app as graph_app
 
 app = FastAPI(title="FinZen AI Service")
 
@@ -10,16 +10,19 @@ app = FastAPI(title="FinZen AI Service")
 async def analyze(input_data: AgentInput):
     # 1. Enriquecer datos (API Composition)
     # Si el frontend no mandó las transacciones, las pedimos nosotros a los microservicios
-    if not input_data.transactions:
+    transactions = input_data.transactions
+    if not transactions:
         input_data.transactions = await get_user_transactions(input_data.user_id)
     
-    if not input_data.goals:
+    goals = input_data.goals
+    if not goals:
         input_data.goals = await get_user_goals(input_data.user_id)
         
-    if not input_data.financial_context:
+    financial_context = input_data.financial_context
+    if not financial_context:
         # Calcular contexto básico si no viene
         summary = await get_financial_summary(input_data.user_id)
-        input_data.financial_context = FinancialContext(
+        financial_context = FinancialContext(
             monthly_income=summary.get("totalIncome", 0),
             fixed_expenses=0, # Simplificación
             variable_expenses=summary.get("totalExpense", 0),
@@ -27,21 +30,22 @@ async def analyze(input_data: AgentInput):
             month_surplus=summary.get("totalIncome", 0) - summary.get("totalExpense", 0)
         )
 
-    # 2. Router Lógico (LangGraph simplificado)
-    query = (input_data.user_query or "").lower()
-    
-    if "meta" in query or "ahorro" in query or "viaje" in query or "comprar" in query:
-        # Delegar a Agente de Metas
-        result = goal_agent.run(input_data.dict())
-    else:
-        # Delegar a Agente Financiero (Default)
-        result = financial_agent.run(input_data.dict())
+    # 2. Ejecutar Grafo
+    initial_state = {
+        "user_id": input_data.user_id,
+        "user_query": input_data.user_query or "analisis general",
+        "transactions": [t.dict() for t in transactions] if transactions else [],
+        "goals": [g.dict() for g in goals] if goals else [],
+        "financial_context": financial_context.dict() if input_data.financial_context else {}
+    }
 
-    # 3. Guardar en Memoria Episódica (PostgreSQL)
-    # TODO: Llamar a src/memory/episodic.py para guardar result en DB
-    
-    return result
+    result = await graph_app.ainvoke(initial_state)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # 3. Formatear Respuesta
+    response_data = result.get("financial_analysis") or result.get("goal_analysis") or {}
+    
+    return AgentOutput(
+        action="ANALYSIS_COMPLETED",
+        message=result.get("final_response", "Análisis completado"),
+        data=response_data
+    )

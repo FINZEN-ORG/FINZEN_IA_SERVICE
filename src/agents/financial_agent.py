@@ -4,12 +4,13 @@ from langchain.schema.output_parser import StrOutputParser
 from src.config import settings
 from src.agents import prompts
 
-llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL, temperature=0)
 
-def run(state: dict):
+async def run(state: dict):
     """
     Analiza la salud financiera o gastos hormiga.
     """
+    print("--- Financial Agent Running ---")
     user_query = state.get("user_query", "").lower()
     transactions = state.get("transactions", [])
     financial_ctx = state.get("financial_context", {})

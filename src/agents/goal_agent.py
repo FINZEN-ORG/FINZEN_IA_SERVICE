@@ -4,12 +4,13 @@ from langchain.schema.output_parser import StrOutputParser
 from src.config import settings
 from src.agents import prompts
 
-llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL, temperature=0)
 
 def run(state: dict):
     """
     Sugiere o evalúa metas.
     """
+    print("--- Goal Agent Running ---")
     user_query = state.get("user_query", "").lower()
     goals = state.get("goals", [])
     financial_ctx = state.get("financial_context", {})
