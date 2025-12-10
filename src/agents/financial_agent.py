@@ -1,6 +1,6 @@
 import json
 from langchain_openai import ChatOpenAI
-from langchain.schema.output_parser import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser
 from config import settings
 from src.agents import financial_prompts
 
@@ -14,7 +14,7 @@ async def run(state: dict):
     transactions = state.get("transactions", [])
     query = state.get("user_query", "").lower()
     
-    # 2. Selección de Prompt (Router interno del agente)
+    # 2. Selección de Prompt
     if "hormiga" in query:
         prompt = financial_prompts.ANT_EXPENSES_PROMPT
     elif "fugas" in query or "leaks" in query:
@@ -26,14 +26,15 @@ async def run(state: dict):
     chain = prompt | llm | StrOutputParser()
     
     # Simplificamos transacciones para el prompt
-    tx_summary = str([t.dict() for t in transactions[:15]])
+    # Nota: transactions aquí es una lista de dicts porque ya se convirtió en main.py
+    tx_summary = str(transactions[:15])
 
     try:
         res = await chain.ainvoke({
             "tone": "friendly",
-            "income": financial_ctx.monthly_income,
-            "expenses": financial_ctx.monthly_expenses,
-            "surplus": financial_ctx.month_surplus,
+            "income": financial_ctx.get("monthly_income", 0),
+            "expenses": financial_ctx.get("monthly_expenses", 0),
+            "surplus": financial_ctx.get("month_surplus", 0),
             "transactions": tx_summary
         })
         
@@ -46,5 +47,5 @@ async def run(state: dict):
             "final_response": "He analizado tus finanzas. Revisa el detalle."
         }
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in Financial Agent: {e}")
         return {"error": str(e)}

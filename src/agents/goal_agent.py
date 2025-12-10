@@ -1,7 +1,7 @@
 import json
 from langchain_openai import ChatOpenAI
-from langchain.schema.output_parser import StrOutputParser
-from config import settings
+from langchain_core.output_parsers import StrOutputParser
+from src.config import settings
 from src.agents import goal_prompts
 
 llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL, temperature=0)
@@ -19,11 +19,11 @@ async def run(state: dict):
         inputs = {"surplus": surplus, "existing_goals": str(goals), "financial_context": str(financial_ctx)}
     elif "evaluar" in query:
         prompt = goal_prompts.EVALUATE_PROMPT
-        inputs = {"new_goal": query, "surplus": surplus, "existing_goals": str(goals)}
+        inputs = {"new_goal": query, "surplus": surplus, "existing_goals": str(goals), "financial_context": str(financial_ctx)}
     else:
         # Default: Track/Status
         prompt = goal_prompts.TRACK_PROMPT
-        inputs = {"goals": str(goals), "surplus": surplus}
+        inputs = {"goals": str(goals), "surplus": surplus, "financial_context": str(financial_ctx)}
 
     # 2. Ejecutar
     chain = prompt | llm | StrOutputParser()
@@ -37,4 +37,5 @@ async def run(state: dict):
             "final_response": "Aquí está el análisis de tus metas."
         }
     except Exception as e:
+        print(f"Error in Goal Agent: {e}")
         return {"error": str(e)}
