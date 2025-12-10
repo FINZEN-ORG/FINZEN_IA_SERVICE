@@ -1,15 +1,14 @@
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 
-# --- Modelos de Entrada (Lo que recibe la API) ---
-
+# --- INPUTS ---
 class TransactionInput(BaseModel):
-    id: str | int
+    id: int | str
     amount: float
     description: str
     date: str
+    type: str
     category_id: int | str
-    type: str  # "INCOME" | "EXPENSE"
 
 class GoalInput(BaseModel):
     id: int
@@ -22,23 +21,29 @@ class GoalInput(BaseModel):
 
 class FinancialContext(BaseModel):
     monthly_income: float
-    monthly_expenses: float
-    month_surplus: float
+    fixed_expenses: float
+    variable_expenses: float
     savings: float
+    month_surplus: float
 
 class AgentInput(BaseModel):
     user_id: int
     user_query: Optional[str] = None
-    context: str = "friendly"  # Tono
-    # Datos inyectados por el orquestador (no por el usuario)
-    # Datos opcionales (si el frontend ya los tiene)
+    context: str = "friendly"
     transactions: List[TransactionInput] = []
     goals: List[GoalInput] = []
     financial_context: Optional[FinancialContext] = None
     semantic_memory: Dict[str, Any] = {}
 
-# --- Modelos de Salida (Lo que devuelve la IA) ---
+# --- OUTPUTS ---
 class AIRecommendation(BaseModel):
+    message: str
+    sentiment: str
+    actionable_tip: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+# ESTA ES LA CLASE QUE FALTABA O ESTABA MAL DEFINIDA
+class AgentOutput(BaseModel):
     action: str
     message: str
-    data: Dict[str, Any] # Aquí va el JSON detallado que generan los prompts complejos
+    data: Dict[str, Any]
