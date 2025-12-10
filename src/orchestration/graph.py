@@ -16,14 +16,14 @@ class AgentState(TypedDict):
 
 # El Router decide a quién llamar basado en la pregunta
 def router(state: AgentState):
-    query = state["user_query"].lower()
-    if "meta" in query or "ahorro" in query or "viaje" in query:
+    q = state["user_query"].lower()
+    if "meta" in q or "ahorro" in q or "viaje" in q or "objetivo" in q:
         return "goal_agent"
-    else:
-        return "financial_agent"
+    return "financial_agent"
 
-# Definición del Grafo
+# Definición del grafo
 workflow = StateGraph(AgentState)
+
 workflow.add_node("financial_agent", financial_agent.run)
 workflow.add_node("goal_agent", goal_agent.run)
 

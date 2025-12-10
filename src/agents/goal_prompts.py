@@ -1,8 +1,6 @@
-from textwrap import dedent
+from langchain.prompts import ChatPromptTemplate
 
-# ---------------------------------------------------------
-
-DISCOVER_PROMPT = dedent("""
+DISCOVER_PROMPT = ChatPromptTemplate.from_template("""
 You are an expert agent specialized in DISCOVERING NEW FINANCIAL GOALS.
 
 Your task:
@@ -57,9 +55,7 @@ Return ONLY this EXACT JSON:
 }
 """)
 
-# ---------------------------------------------------------
-
-EVALUATE_PROMPT = dedent("""
+EVALUATE_PROMPT = ChatPromptTemplate.from_template("""
 You are an agent specialized in EVALUATING THE VIABILITY OF A FINANCIAL GOAL.
 
 Your task:
@@ -100,9 +96,7 @@ Return ONLY this EXACT JSON:
 }
 """)
 
-# ---------------------------------------------------------
-
-ADJUST_PROMPT = dedent("""
+ADJUST_PROMPT = ChatPromptTemplate.from_template("""
 You are an agent specialized in SMART AND EMOTIONALLY SAFE GOAL ADJUSTMENT.
 
 Your task:
@@ -157,9 +151,7 @@ Return ONLY this EXACT JSON:
 }
 """)
 
-# ---------------------------------------------------------
-
-TRACK_PROMPT = dedent("""
+TRACK_PROMPT = ChatPromptTemplate.from_template("""
 You are an expert agent in TRACKING A SINGLE FINANCIAL GOAL.
 
 Your task:
@@ -202,7 +194,7 @@ Return ONLY this EXACT JSON:
 }
 """)
 
-BUILD_GOAL_CONTEXT_PROMPT = dedent("""
+BUILD_GOAL_CONTEXT_PROMPT = ChatPromptTemplate.from_template("""
 You are an expert agent responsible for BUILDING ENRICHED GOAL CONTEXTS
 to be consumed by other agents (especially the motivational agent).
 
@@ -269,13 +261,3 @@ Return ONLY this EXACT JSON:
   ]
 }
 """)
-
-
-# =========================================================
-AGENT_PROMPTS = {
-    "discover_goals": DISCOVER_PROMPT,
-    "evaluate_goal": EVALUATE_PROMPT,
-    "adjust_goals": ADJUST_PROMPT,
-    "track_goal": TRACK_PROMPT,
-    "build_goal_context": BUILD_GOAL_CONTEXT_PROMPT
-}

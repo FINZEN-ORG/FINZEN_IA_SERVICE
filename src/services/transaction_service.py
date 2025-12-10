@@ -23,7 +23,7 @@ async def get_user_transactions(user_id: int):
 async def get_financial_summary(user_id: int):
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(f"{settings.TRANSACTIONS_SERVICE_URL}/transactions/reports") # Tu endpoint de reportes
+            response = await client.get(f"{settings.TRANSACTIONS_SERVICE_URL}/transactions/reports")
             return response.json() if response.status_code == 200 else {}
         except:
             return {}

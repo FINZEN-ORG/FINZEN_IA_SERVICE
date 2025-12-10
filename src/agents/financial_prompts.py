@@ -1,6 +1,40 @@
-# ---------------------------------------------------------
+from langchain.prompts import ChatPromptTemplate
 
-ANT_EXPENSES_PROMPT = """
+HEALTH_PROMPT = ChatPromptTemplate.from_template("""
+You are a financial health evaluator. Tone: {tone}.
+Analyze the user's financial condition based on:
+- Income: {income}
+- Expenses: {expenses}
+- Surplus: {surplus}
+- Recent Transactions: {transactions}
+
+Evaluate:
+- Income stability
+- Balance between fixed and variable expenses
+- Savings and surplus capacity
+- Exposure to financial stress or overcommitment
+
+Rules:
+- No value judgments
+- No emotional language
+- Produce metrics usable by other agents
+
+OUTPUT (JSON ONLY):
+
+{
+  "health_evaluation": {
+    "health_score": 0,
+    "health_status": "poor|fragile|stable|healthy",
+    "monthly_surplus": 0,
+    "income_stability": "low|medium|high",
+    "risk_flags": [
+      "..."
+    ]
+  }
+}
+""")
+
+ANT_EXPENSES_PROMPT = ChatPromptTemplate.from_template("""
 You are a financial analyst specialized in identifying ANT EXPENSES
 (small, frequent spending that accumulates into significant financial leakage).
 
@@ -38,10 +72,9 @@ OUTPUT (JSON ONLY):
     }
   ]
 }
-"""
-# ---------------------------------------------------------
+""")
 
-REPETITIVE_EXPENSES_PROMPT = """
+REPETITIVE_EXPENSES_PROMPT = ChatPromptTemplate.from_template("""
 You are a financial analyst identifying REPETITIVE EXPENSES and STABLE HABITS.
 
 You receive:
@@ -77,47 +110,9 @@ OUTPUT (JSON ONLY):
     }
   ]
 }
-"""
-# ---------------------------------------------------------
+""")
 
-HEALTH_PROMPT = """
-You are a financial health evaluator providing a neutral,
-structured snapshot of the user's financial condition.
-
-You receive:
-- Financial context (income, expenses, surplus)
-- Aggregated transaction behavior
-- Semantic memory (stress, emotional signals related to money)
-
-Evaluate:
-- Income stability
-- Balance between fixed and variable expenses
-- Savings and surplus capacity
-- Exposure to financial stress or overcommitment
-
-Rules:
-- No value judgments
-- No emotional language
-- Produce metrics usable by other agents
-
-OUTPUT (JSON ONLY):
-
-{
-  "health_evaluation": {
-    "health_score": 0,
-    "health_status": "poor|fragile|stable|healthy",
-    "monthly_surplus": 0,
-    "income_stability": "low|medium|high",
-    "risk_flags": [
-      "..."
-    ]
-  }
-}
-"""
-
-# ---------------------------------------------------------
-
-LEAKS_PROMPT = """
+LEAKS_PROMPT = ChatPromptTemplate.from_template("""
 You are an analyst specialized in detecting SIGNIFICANT MONEY LEAKS.
 
 You receive:
@@ -147,10 +142,9 @@ OUTPUT (JSON ONLY):
     }
   ]
 }
-"""
-# ------------------------------------------------------------
+""")
 
-FULL_ANALYSIS_PROMPT = """
+FULL_ANALYSIS_PROMPT = ChatPromptTemplate.from_template("""
 You are a SENIOR FINANCIAL ANALYSIS AGENT.
 
 You receive:
@@ -246,4 +240,4 @@ OUTPUT (JSON ONLY):
     ]
   }
 }
-"""
+""")

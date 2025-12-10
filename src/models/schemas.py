@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Any, Dict, Union
+from typing import List, Optional, Any, Dict
 
 # --- Modelos de Entrada (Lo que recibe la API) ---
 
@@ -11,15 +11,8 @@ class TransactionInput(BaseModel):
     category_id: int | str
     type: str  # "INCOME" | "EXPENSE"
 
-class FinancialContext(BaseModel):
-    monthly_income: float
-    fixed_expenses: float
-    variable_expenses: float
-    savings: float
-    month_surplus: float
-
 class GoalInput(BaseModel):
-    id: Optional[int] = None
+    id: int
     name: str
     target_amount: float
     saved_amount: float
@@ -27,11 +20,16 @@ class GoalInput(BaseModel):
     due_date: Optional[str] = None
     status: str
 
+class FinancialContext(BaseModel):
+    monthly_income: float
+    monthly_expenses: float
+    month_surplus: float
+    savings: float
+
 class AgentInput(BaseModel):
     user_id: int
     user_query: Optional[str] = None
     context: str = "friendly"  # Tono
-    
     # Datos inyectados por el orquestador (no por el usuario)
     # Datos opcionales (si el frontend ya los tiene)
     transactions: List[TransactionInput] = []
@@ -40,14 +38,7 @@ class AgentInput(BaseModel):
     semantic_memory: Dict[str, Any] = {}
 
 # --- Modelos de Salida (Lo que devuelve la IA) ---
-
 class AIRecommendation(BaseModel):
+    action: str
     message: str
-    sentiment: str  # POSITIVE, WARNING, CRITICAL, INFO
-    actionable_tip: Optional[str] = None
-    data: Optional[Dict[str, Any]] = None # Datos extra (ej: lista de hormiga)
-
-class AgentOutput(BaseModel):
-    action: str # "FINANCIAL_ANALYSIS" | "GOAL_ADVICE"
-    message: str
-    data: Dict[str, Any] # Aquí va el JSON complejo que generan los prompts
+    data: Dict[str, Any] # Aquí va el JSON detallado que generan los prompts complejos

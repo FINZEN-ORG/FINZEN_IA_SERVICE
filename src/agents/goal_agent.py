@@ -1,49 +1,40 @@
 import json
 from langchain_openai import ChatOpenAI
 from langchain.schema.output_parser import StrOutputParser
-from src.config import settings
-from src.agents import prompts
+from config import settings
+from src.agents import goal_prompts
 
 llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL, temperature=0)
 
-def run(state: dict):
-    """
-    Sugiere o evalúa metas.
-    """
+async def run(state: dict):
     print("--- Goal Agent Running ---")
-    user_query = state.get("user_query", "").lower()
+    query = state.get("user_query", "").lower()
     goals = state.get("goals", [])
     financial_ctx = state.get("financial_context", {})
-    tone = state.get("context", "friendly")
+    surplus = financial_ctx.get("month_surplus", 0)
 
-    # Selección de Lógica
-    if "evaluar" in user_query or "puedo" in user_query:
-        # Lógica de Evaluación (Extraer la meta del query es complejo sin NLP, asumimos contexto general)
-        prompt_template = prompts.EVALUATE_GOAL_PROMPT
-        # Aquí deberías extraer qué meta quiere evaluar del string user_query
-        new_goal_desc = user_query 
+    # 1. Router interno
+    if "sugerir" in query or "nueva" in query:
+        prompt = goal_prompts.DISCOVER_PROMPT
+        inputs = {"surplus": surplus, "existing_goals": str(goals), "financial_context": str(financial_ctx)}
+    elif "evaluar" in query:
+        prompt = goal_prompts.EVALUATE_PROMPT
+        inputs = {"new_goal": query, "surplus": surplus, "existing_goals": str(goals)}
     else:
-        # Por defecto sugerir (Discover)
-        prompt_template = prompts.DISCOVER_GOALS_PROMPT
-        new_goal_desc = ""
+        # Default: Track/Status
+        prompt = goal_prompts.TRACK_PROMPT
+        inputs = {"goals": str(goals), "surplus": surplus}
 
-    chain = prompt_template | llm | StrOutputParser()
-
+    # 2. Ejecutar
+    chain = prompt | llm | StrOutputParser()
+    
     try:
-        response_str = chain.invoke({
-            "tone": tone,
-            "financial_context": str(financial_ctx.dict()),
-            "existing_goals": str([g.dict() for g in goals]),
-            "new_goal": new_goal_desc
-        })
-        
-        clean_json = response_str.replace("```json", "").replace("```", "")
-        return json.loads(clean_json)
-
-    except Exception as e:
-        print(f"Error in Goal Agent: {e}")
+        res = await chain.ainvoke({**inputs, "tone": "friendly"})
+        clean_json = res.replace("```json", "").replace("```", "")
+        data = json.loads(clean_json)
         return {
-            "message": "No pude procesar tus metas.",
-            "sentiment": "INFO",
-            "actionable_tip": "Define un monto y fecha."
+            "goal_analysis": data,
+            "final_response": "Aquí está el análisis de tus metas."
         }
+    except Exception as e:
+        return {"error": str(e)}

@@ -15,9 +15,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el código fuente
 COPY . .
-# Crear un usuario no-root por seguridad (Azure lo recomienda)
-# RUN useradd -m appuser && chown -R appuser /app
-# USER appuser
 # Exponer el puerto
 EXPOSE 8000
 # Comando de arranque apuntando a src.main:app
