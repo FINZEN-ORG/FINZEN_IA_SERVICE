@@ -1,5 +1,5 @@
 import httpx
-from src.config import settings
+from config import settings
 
 async def get_user_transactions(user_id: int):
     # En un entorno real, aquí deberías pasar un token de servicio o propagar el del usuario.
@@ -23,7 +23,11 @@ async def get_user_transactions(user_id: int):
 async def get_financial_summary(user_id: int):
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(f"{settings.TRANSACTIONS_SERVICE_URL}/transactions/reports")
+            response = await client.get(
+                f"{settings.TRANSACTIONS_SERVICE_URL}/transactions/reports",
+                headers={"X-User-Id": str(user_id)} # O el header que uses
+            )
             return response.json() if response.status_code == 200 else {}
-        except:
-            return {}
+        except Exception as e:
+            print(f"Error fetching transactions reports: {e}")
+            return []
