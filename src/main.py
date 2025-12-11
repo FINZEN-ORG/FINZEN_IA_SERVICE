@@ -39,15 +39,24 @@ async def health_check():
 async def fetch_transactions(token: str):
     """Obtiene transacciones del microservicio de Transactions con token propagation"""
     try:
+        url = f"{settings.TRANSACTIONS_SERVICE_URL}/transactions"
+        print(f" Fetching transactions from: {url}")
+        print(f" Using token: {token[:50]}...")
+        
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{settings.TRANSACTIONS_SERVICE_URL}/transactions",
+                url,
                 headers={"Authorization": token}
             )
+            
+            print(f" Response status: {response.status_code}")
+            
             if response.status_code == 200:
                 data = response.json()
+                print(f" Fetched {len(data)} transactions")
+                
                 # Convertir a formato esperado
-                return [
+                transactions = [
                     TransactionInput(
                         id=t.get("id"),
                         amount=float(t.get("amount", 0)),
@@ -58,37 +67,60 @@ async def fetch_transactions(token: str):
                     )
                     for t in data
                 ]
-            return []
+                return transactions
+            else:
+                print(f" Error response: {response.text}")
+                return []
     except Exception as e:
-        print(f"Error fetching transactions: {e}")
+        print(f" Error fetching transactions: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 async def fetch_financial_summary(token: str):
     """Obtiene resumen financiero del microservicio de Transactions con token propagation"""
     try:
+        url = f"{settings.TRANSACTIONS_SERVICE_URL}/transactions/reports"
+        print(f" Fetching reports from: {url}")
+        
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{settings.TRANSACTIONS_SERVICE_URL}/transactions/reports",
+                url,
                 headers={"Authorization": token}
             )
+            
+            print(f" Reports response status: {response.status_code}")
+            
             if response.status_code == 200:
-                return response.json()
-            return {}
+                data = response.json()
+                print(f" Fetched reports: {data}")
+                return data
+            else:
+                print(f" Error response: {response.text}")
+                return {}
     except Exception as e:
-        print(f"Error fetching financial summary: {e}")
+        print(f" Error fetching financial summary: {e}")
         return {}
 
 async def fetch_goals(token: str):
     """Obtiene metas del microservicio de Goals con token propagation"""
     try:
+        url = f"{settings.GOALS_SERVICE_URL}/goals"
+        print(f" Fetching goals from: {url}")
+        
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{settings.GOALS_SERVICE_URL}/goals",
+                url,
                 headers={"Authorization": token}
             )
+            
+            print(f" Goals response status: {response.status_code}")
+            
             if response.status_code == 200:
                 data = response.json()
-                return [
+                print(f" Fetched {len(data)} goals")
+                
+                goals = [
                     GoalInput(
                         id=g.get("id"),
                         name=g.get("name", ""),
@@ -100,9 +132,14 @@ async def fetch_goals(token: str):
                     )
                     for g in data
                 ]
-            return []
+                return goals
+            else:
+                print(f" Error response: {response.text}")
+                return []
     except Exception as e:
-        print(f"Error fetching goals: {e}")
+        print(f" Error fetching goals: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 @app.post("/analyze", response_model=AgentOutput)
@@ -117,18 +154,21 @@ async def analyze(input_data: AgentInput,authorization: Optional[str] = Header(N
     try:
         # 1. Enriquecer datos desde microservicios (API Composition + Token Propagation)
         print(f" Fetching data for user {input_data.user_id}")
+        print(f" Authorization header: {authorization[:50]}...")
         
         if not input_data.transactions:
             input_data.transactions = await fetch_transactions(authorization)
+            print(f" Loaded {len(input_data.transactions)} transactions")
         
         if not input_data.goals:
             input_data.goals = await fetch_goals(authorization)
+            print(f" Loaded {len(input_data.goals)} goals")
         
         if not input_data.financial_context:
             summary = await fetch_financial_summary(authorization)
             income = float(summary.get("totalIncome", 0) or 0)
             expense = float(summary.get("totalExpense", 0) or 0)
-            
+            print(f" Financial summary - Income: {income}, Expense: {expense}")
             input_data.financial_context = FinancialContext(
                 monthly_income=income,
                 fixed_expenses=0,
