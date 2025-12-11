@@ -36,14 +36,13 @@ class AgentInput(BaseModel):
     semantic_memory: Dict[str, Any] = {}
 
 # --- OUTPUTS ---
+class AgentOutput(BaseModel):
+    action: str
+    message: str
+    data: Dict[str, Any]
+
 class AIRecommendation(BaseModel):
     message: str
     sentiment: str
     actionable_tip: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
-
-# ESTA ES LA CLASE QUE FALTABA O ESTABA MAL DEFINIDA
-class AgentOutput(BaseModel):
-    action: str
-    message: str
-    data: Dict[str, Any]
