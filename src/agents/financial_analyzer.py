@@ -8,6 +8,7 @@ class FinancialAnalyzer:
     """
     Agente especializado en análisis financiero.
     Detecta gastos hormiga, fugas de dinero, y evalúa salud financiera.
+    Usa semantic_profile para personalizar recomendaciones.
     """
     
     def __init__(self):
@@ -17,9 +18,10 @@ class FinancialAnalyzer:
             temperature=settings.OPENAI_TEMPERATURE
         )
     
-    async def analyze(self,user_id: int,query: str,transactions: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
+    async def analyze(self,query: str,transactions: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
         """
-        Ejecuta el análisis financiero según el tipo de consulta
+        Ejecuta el análisis financiero según el tipo de consulta.
+        Usa semantic_profile para personalizar el tono y enfoque del análisis.
         """
         query_lower = query.lower()
         
@@ -51,10 +53,20 @@ class FinancialAnalyzer:
             )
     
     async def _analyze_health(self,transactions: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Análisis de salud financiera general"""
+        """
+        Análisis de salud financiera general.
+        Usa semantic_profile para adaptar el tono del mensaje.
+        """
+        
+        # Adaptar tono según perfil
+        tone = semantic_profile.get("preferred_tone", "friendly")
+        literacy_level = semantic_profile.get("financial_literacy", "beginner")
         
         prompt = ChatPromptTemplate.from_template("""
             Eres un asesor financiero experto. Analiza la situación financiera del usuario.
+
+            TONO A USAR: {tone}
+            NIVEL DE CONOCIMIENTO FINANCIERO: {literacy_level}
 
             CONTEXTO FINANCIERO:
             - Ingreso mensual: ${income}
@@ -75,7 +87,8 @@ class FinancialAnalyzer:
             5. Categorías con mayor gasto
 
             REGLAS:
-            - No uses juicios de valor
+            - Adapta tu lenguaje al nivel de conocimiento financiero del usuario
+            - Usa el tono especificado
             - Sé objetivo y basado en datos
             - Identifica patrones específicos
             - Proporciona métricas útiles
@@ -91,7 +104,7 @@ class FinancialAnalyzer:
             ],
             "risk_flags": ["..."],
             "recommendations": ["..."],
-            "message": "Mensaje amigable y motivador para el usuario"
+            "message": "Mensaje personalizado según tono y nivel del usuario"
             }}
         """)
         
@@ -106,6 +119,8 @@ class FinancialAnalyzer:
             ])
             
             result = await chain.ainvoke({
+                "tone": tone,
+                "literacy_level": literacy_level,
                 "income": financial_context.get("monthly_income", 0),
                 "expenses": financial_context.get("variable_expenses", 0),
                 "surplus": financial_context.get("month_surplus", 0),
@@ -125,10 +140,19 @@ class FinancialAnalyzer:
             }
     
     async def _analyze_ant_expenses(self,transactions: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Detecta gastos hormiga (pequeños gastos frecuentes)"""
+        """
+        Detecta gastos hormiga (pequeños gastos frecuentes).
+        Usa semantic_profile para determinar el estilo motivacional.
+        """
+        
+        motivation_style = semantic_profile.get("motivation_style", "balanced")
+        risk_tolerance = semantic_profile.get("risk_tolerance", "medium")
         
         prompt = ChatPromptTemplate.from_template("""
             Eres un analista financiero especializado en detectar GASTOS HORMIGA.
+
+            ESTILO MOTIVACIONAL DEL USUARIO: {motivation_style}
+            TOLERANCIA AL RIESGO: {risk_tolerance}
 
             Los gastos hormiga son:
             - Compras pequeñas y frecuentes
@@ -149,6 +173,7 @@ class FinancialAnalyzer:
             3. Identifica si es habitual u ocasional
 
             REGLAS:
+            - Adapta tu mensaje al estilo motivacional del usuario
             - No moralices el gasto
             - Sé objetivo y constructivo
             - Enfócate en el impacto acumulado
@@ -166,7 +191,7 @@ class FinancialAnalyzer:
                 }}
             ],
             "total_monthly_impact": float,
-            "message": "Mensaje constructivo y amigable",
+            "message": "Mensaje constructivo adaptado al estilo motivacional",
             "suggestions": ["Sugerencias prácticas sin presión"]
             }}
         """)
@@ -187,6 +212,8 @@ class FinancialAnalyzer:
             ])
             
             result = await chain.ainvoke({
+                "motivation_style": motivation_style,
+                "risk_tolerance": risk_tolerance,
                 "transactions": tx_text,
                 "income": financial_context.get("monthly_income", 0),
                 "surplus": financial_context.get("month_surplus", 0)
@@ -203,10 +230,18 @@ class FinancialAnalyzer:
             }
     
     async def _analyze_leaks(self,transactions: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Detecta fugas de dinero (gastos anormales o crecientes)"""
+        """
+        Detecta fugas de dinero (gastos anormales o crecientes).
+        Usa semantic_profile para personalizar las alertas.
+        """
+        
+        emotional_state = semantic_profile.get("emotional_state", "neutral")
         
         prompt = ChatPromptTemplate.from_template("""
             Eres un analista experto en detectar FUGAS DE DINERO.
+
+            ESTADO EMOCIONAL DEL USUARIO: {emotional_state}
+            (Adapta tu mensaje para no causar estrés adicional si ya está preocupado)
 
             Las fugas son:
             - Gastos anormalmente altos
@@ -236,7 +271,7 @@ class FinancialAnalyzer:
                 }}
             ],
             "total_leak_impact": float,
-            "message": "Mensaje amigable",
+            "message": "Mensaje empático adaptado al estado emocional",
             "action_items": ["Acciones sugeridas"]
             }}
         """)
@@ -245,6 +280,7 @@ class FinancialAnalyzer:
             chain = prompt | self.llm | JsonOutputParser()
             
             result = await chain.ainvoke({
+                "emotional_state": emotional_state,
                 "transactions": str(transactions[-30:]),
                 "income": financial_context.get("monthly_income", 0),
                 "surplus": financial_context.get("month_surplus", 0)
@@ -261,18 +297,29 @@ class FinancialAnalyzer:
             }
     
     async def _analyze_repetitive(self,transactions: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Analiza gastos repetitivos y suscripciones"""
+        """
+        Analiza gastos repetitivos y suscripciones.
+        Usa semantic_profile para priorizar recomendaciones.
+        """
+        
+        spending_patterns = semantic_profile.get("spending_patterns", [])
         
         prompt = ChatPromptTemplate.from_template("""
             Analiza gastos REPETITIVOS y SUSCRIPCIONES.
 
+            PATRONES DE GASTO CONOCIDOS: {patterns}
+
             TRANSACCIONES:
             {transactions}
+
+            CONTEXTO:
+            - Excedente mensual: ${surplus}
 
             Identifica:
             1. Gastos que se repiten mensualmente
             2. Frecuencia y monto promedio
             3. Impacto en el presupuesto mensual
+            4. Alineación con patrones de gasto conocidos
 
             RESPONDE SOLO EN JSON:
             {{
@@ -282,17 +329,26 @@ class FinancialAnalyzer:
                 "frequency": "monthly|weekly",
                 "average_amount": float,
                 "annual_cost": float,
-                "category_id": int
+                "category_id": int,
+                "matches_known_pattern": boolean
                 }}
             ],
             "total_monthly_recurring": float,
-            "message": "Resumen amigable"
+            "message": "Resumen considerando patrones conocidos"
             }}
         """)
         
         try:
             chain = prompt | self.llm | JsonOutputParser()
-            result = await chain.ainvoke({"transactions": str(transactions[-60:])})
+            result = await chain.ainvoke({
+                "patterns": str(spending_patterns),
+                "transactions": str(transactions[-60:]),
+                "surplus": financial_context.get("month_surplus", 0)
+            })
             return result
         except Exception as e:
-            return {"repetitive_expenses": [], "error": str(e)}
+            return {
+                "repetitive_expenses": [],
+                "message": "No se detectaron gastos repetitivos.",
+                "error": str(e)
+            }

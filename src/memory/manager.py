@@ -1,5 +1,5 @@
 from sqlalchemy import func, desc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import json
 from src.memory.database import SessionLocal
@@ -30,7 +30,7 @@ class MemoryManager:
                 query=query,
                 agent_used=agent_type,
                 response=response,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(memory)
             db.commit()
@@ -96,7 +96,8 @@ class MemoryManager:
     
     def update_semantic_profile_if_needed(self, user_id: int) -> None:
         """
-        Actualiza el perfil semántico si se alcanzó el threshold de interacciones
+        Actualiza el perfil semántico si se alcanzó el threshold de interacciones.
+        Usa el user_id para filtrar interacciones específicas del usuario.
         """
         db = SessionLocal()
         try:
@@ -115,7 +116,7 @@ class MemoryManager:
                 if interactions_since < settings.SEMANTIC_UPDATE_THRESHOLD:
                     return
             
-            # Obtener interacciones recientes
+            # Obtener interacciones recientes del usuario específico
             recent = self.get_recent_interactions(
                 user_id,
                 limit=settings.SEMANTIC_UPDATE_THRESHOLD * 2
@@ -124,8 +125,8 @@ class MemoryManager:
             if not recent:
                 return
             
-            # Generar nuevo perfil semántico con LLM
-            new_profile = self._generate_semantic_profile(user_id, recent)
+            # Generar nuevo perfil semántico con LLM usando las interacciones del usuario
+            new_profile = self._generate_semantic_profile(recent)
             
             if not new_profile:
                 return
@@ -135,12 +136,12 @@ class MemoryManager:
                 current_attrs = profile.attributes or {}
                 current_attrs.update(new_profile)
                 profile.attributes = current_attrs
-                profile.last_updated = datetime.utcnow()
+                profile.last_updated = datetime.now(timezone.utc)
             else:
                 profile = SemanticProfile(
                     user_id=user_id,
                     attributes=new_profile,
-                    last_updated=datetime.utcnow()
+                    last_updated=datetime.now(timezone.utc)
                 )
                 db.add(profile)
             
@@ -153,10 +154,10 @@ class MemoryManager:
         finally:
             db.close()
     
-    def _generate_semantic_profile(self,user_id: int,interactions: List[Dict]) -> Optional[Dict]:
+    def _generate_semantic_profile(self,interactions: List[Dict]) -> Optional[Dict]:
         """
         Usa el LLM para generar un perfil semántico compacto
-        basado en las interacciones recientes
+        basado en las interacciones recientes del usuario.
         """
         try:
             prompt = ChatPromptTemplate.from_template("""
@@ -194,7 +195,7 @@ class MemoryManager:
             days = settings.EPISODIC_RETENTION_DAYS
         db = SessionLocal()
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
             deleted = db.query(EpisodicMemory)\
                 .filter(EpisodicMemory.created_at < cutoff_date)\
                 .delete()

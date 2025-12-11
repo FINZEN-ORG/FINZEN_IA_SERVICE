@@ -1,0 +1,50 @@
+services:
+  db-ai:
+    image: postgres:14-alpine
+    container_name: finzen-db-ai
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finzen_ai_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_ai_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d finzen_ai_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finzen-api-ai
+    restart: on-failure
+    depends_on:
+      db-ai:
+        condition: service_healthy
+    ports:
+      - "8084:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-4o-mini
+      OPENAI_TEMPERATURE: 0.3
+      DATABASE_URL: postgresql://admin:password@db-ai:5432/finzen_ai_db
+      TRANSACTIONS_SERVICE_URL: http://host.docker.internal:8082/api
+      GOALS_SERVICE_URL: http://host.docker.internal:8083/api
+      SEMANTIC_UPDATE_THRESHOLD: 5
+      EPISODIC_RETENTION_DAYS: 60
+      MAX_TRANSACTIONS_FOR_ANALYSIS: 100
+      ANT_EXPENSE_THRESHOLD: 5000.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_ai_data:

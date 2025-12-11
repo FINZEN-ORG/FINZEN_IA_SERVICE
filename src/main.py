@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Header, HTTPException
 from typing import Optional
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from src.models.schemas import (
     AgentInput, 
     AgentOutput, 
@@ -33,11 +33,11 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "FinZen AI Service",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-async def fetch_transactions(user_id: int, token: str):
-    """Obtiene transacciones del microservicio de Transactions"""
+async def fetch_transactions(token: str):
+    """Obtiene transacciones del microservicio de Transactions con token propagation"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
@@ -63,8 +63,8 @@ async def fetch_transactions(user_id: int, token: str):
         print(f"Error fetching transactions: {e}")
         return []
 
-async def fetch_financial_summary(user_id: int, token: str):
-    """Obtiene resumen financiero del microservicio de Transactions"""
+async def fetch_financial_summary(token: str):
+    """Obtiene resumen financiero del microservicio de Transactions con token propagation"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
@@ -78,8 +78,8 @@ async def fetch_financial_summary(user_id: int, token: str):
         print(f"Error fetching financial summary: {e}")
         return {}
 
-async def fetch_goals(user_id: int, token: str):
-    """Obtiene metas del microservicio de Goals"""
+async def fetch_goals(token: str):
+    """Obtiene metas del microservicio de Goals con token propagation"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
@@ -119,22 +119,13 @@ async def analyze(input_data: AgentInput,authorization: Optional[str] = Header(N
         print(f" Fetching data for user {input_data.user_id}")
         
         if not input_data.transactions:
-            input_data.transactions = await fetch_transactions(
-                input_data.user_id, 
-                authorization
-            )
+            input_data.transactions = await fetch_transactions(authorization)
         
         if not input_data.goals:
-            input_data.goals = await fetch_goals(
-                input_data.user_id,
-                authorization
-            )
+            input_data.goals = await fetch_goals(authorization)
         
         if not input_data.financial_context:
-            summary = await fetch_financial_summary(
-                input_data.user_id,
-                authorization
-            )
+            summary = await fetch_financial_summary(authorization)
             income = float(summary.get("totalIncome", 0) or 0)
             expense = float(summary.get("totalExpense", 0) or 0)
             
@@ -156,7 +147,6 @@ async def analyze(input_data: AgentInput,authorization: Optional[str] = Header(N
             # Análisis de metas
             print(" Running Goal Analysis")
             result = await goal_analyzer.analyze(
-                user_id=input_data.user_id,
                 query=query,
                 goals=[g.model_dump() for g in input_data.goals],
                 financial_context=input_data.financial_context.model_dump(),
@@ -167,7 +157,6 @@ async def analyze(input_data: AgentInput,authorization: Optional[str] = Header(N
             # Análisis financiero
             print(" Running Financial Analysis")
             result = await financial_analyzer.analyze(
-                user_id=input_data.user_id,
                 query=query,
                 transactions=[t.model_dump() for t in input_data.transactions],
                 financial_context=input_data.financial_context.model_dump(),
@@ -206,7 +195,7 @@ async def analyze(input_data: AgentInput,authorization: Optional[str] = Header(N
 async def chat(input_data: AgentInput,authorization: Optional[str] = Header(None)):
     """
     Endpoint para chat conversacional con la IA.
-    Mantiene contexto de conversación.
+    Mantiene contexto de conversación usando memoria episódica.
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header required")
@@ -217,10 +206,16 @@ async def chat(input_data: AgentInput,authorization: Optional[str] = Header(None
         limit=5
     )
     
-    # TODO: Implementar lógica de chat conversacional
+    # Implementación básica de chat con contexto
+    context_messages = "\n".join([
+        f"Usuario: {h['query']}\nAsistente: {h['response'].get('message', '')}"
+        for h in recent_history
+    ])
+    
     return {
-        "response": "Chat endpoint - próximamente disponible",
-        "history": recent_history
+        "response": f"Chat endpoint activo. Contexto: {len(recent_history)} mensajes anteriores.",
+        "history": recent_history,
+        "context": context_messages
     }
 
 if __name__ == "__main__":

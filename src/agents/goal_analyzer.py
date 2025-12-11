@@ -1,5 +1,4 @@
 from typing import Dict, List
-from datetime import datetime, date
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
@@ -9,6 +8,7 @@ class GoalAnalyzer:
     """
     Agente especializado en análisis de metas financieras.
     Sugiere, evalúa y monitorea el progreso de objetivos financieros.
+    Usa semantic_profile para personalizar recomendaciones.
     """
     
     def __init__(self):
@@ -18,9 +18,10 @@ class GoalAnalyzer:
             temperature=settings.OPENAI_TEMPERATURE
         )
     
-    async def analyze(self,user_id: int,query: str,goals: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
+    async def analyze(self,query: str,goals: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
         """
-        Ejecuta el análisis de metas según el tipo de consulta
+        Ejecuta el análisis de metas según el tipo de consulta.
+        Usa semantic_profile para personalizar el enfoque y tono.
         """
         query_lower = query.lower()
         
@@ -52,35 +53,47 @@ class GoalAnalyzer:
             )
     
     async def _suggest_goals(self,existing_goals: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Sugiere nuevas metas financieras realistas"""
+        """
+        Sugiere nuevas metas financieras realistas.
+        Usa semantic_profile para personalizar las sugerencias según
+        tolerancia al riesgo y estilo motivacional.
+        """
+        
+        risk_tolerance = semantic_profile.get("risk_tolerance", "medium")
+        motivation_style = semantic_profile.get("motivation_style", "balanced")
+        preferred_categories = semantic_profile.get("preferred_categories", [])
         
         prompt = ChatPromptTemplate.from_template("""
             Eres un asesor financiero experto en establecimiento de metas.
+
+            PERFIL DEL USUARIO:
+            - Tolerancia al riesgo: {risk_tolerance}
+            - Estilo motivacional: {motivation_style}
+            - Categorías preferidas: {preferred_categories}
 
             CONTEXTO FINANCIERO:
             - Ingreso mensual: ${income}
             - Excedente mensual: ${surplus}
 
-            PERFIL DEL USUARIO:
+            PERFIL COMPLETO:
             {profile}
 
             METAS EXISTENTES:
             {existing_goals}
 
             Sugiere hasta 3 metas financieras que sean:
-            1. REALISTAS según el excedente disponible
-            2. MOTIVADORAS y alineadas con el perfil
+            1. REALISTAS según el excedente y perfil de riesgo
+            2. MOTIVADORAS y alineadas con el estilo motivacional
             3. ESPECÍFICAS y medibles
             4. NO DUPLICADAS con las existentes
 
-            Prioriza:
-            - Fondo de emergencia (si no existe)
-            - Metas que conviertan gastos en ahorros intencionales
-            - Objetivos de crecimiento personal
+            Prioriza según el perfil:
+            - risk_tolerance: high → metas ambiciosas | low → metas conservadoras
+            - motivation_style: goal_oriented → metas específicas | stress_averse → metas flexibles
 
             REGLAS:
             - No sugieras metas que excedan el excedente mensual
-            - Sé empático y motivador
+            - Sé empático y motivador según el estilo
             - Evita presión o culpa
 
             RESPONDE SOLO EN JSON:
@@ -88,15 +101,16 @@ class GoalAnalyzer:
             "suggested_goals": [
                 {{
                 "name": "Nombre claro de la meta",
-                "reason": "Por qué es relevante para este usuario",
+                "reason": "Por qué es relevante para este usuario específico",
                 "estimated_target": float,
                 "suggested_timeframe_months": int,
                 "monthly_contribution": float,
-                "category": "TRAVEL|EMERGENCY_FUND|EDUCATION|TECHNOLOGY|HOME|OTHER"
+                "category": "TRAVEL|EMERGENCY_FUND|EDUCATION|TECHNOLOGY|HOME|OTHER",
+                "risk_alignment": "Explicar cómo se alinea con su perfil de riesgo"
                 }}
             ],
-            "message": "Mensaje motivador personalizado",
-            "next_steps": ["Pasos concretos para comenzar"]
+            "message": "Mensaje motivador personalizado según estilo",
+            "next_steps": ["Pasos concretos considerando su perfil"]
             }}
         """)
         
@@ -104,6 +118,9 @@ class GoalAnalyzer:
             chain = prompt | self.llm | JsonOutputParser()
             
             result = await chain.ainvoke({
+                "risk_tolerance": risk_tolerance,
+                "motivation_style": motivation_style,
+                "preferred_categories": str(preferred_categories),
                 "income": financial_context.get("monthly_income", 0),
                 "surplus": financial_context.get("month_surplus", 0),
                 "profile": str(semantic_profile),
@@ -121,10 +138,20 @@ class GoalAnalyzer:
             }
     
     async def _evaluate_goal(self,query: str,existing_goals: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Evalúa la viabilidad de una meta propuesta"""
+        """
+        Evalúa la viabilidad de una meta propuesta.
+        Considera el perfil de riesgo y estado emocional del usuario.
+        """
+        
+        risk_tolerance = semantic_profile.get("risk_tolerance", "medium")
+        emotional_state = semantic_profile.get("emotional_state", "neutral")
         
         prompt = ChatPromptTemplate.from_template("""
             Evalúa la VIABILIDAD de una meta financiera propuesta.
+
+            PERFIL DEL USUARIO:
+            - Tolerancia al riesgo: {risk_tolerance}
+            - Estado emocional: {emotional_state}
 
             CONSULTA DEL USUARIO:
             {query}
@@ -136,32 +163,36 @@ class GoalAnalyzer:
             METAS EXISTENTES:
             {existing_goals}
 
-            PERFIL:
+            PERFIL COMPLETO:
             {profile}
 
             Evalúa si la meta es:
             1. Financieramente viable con el excedente actual
             2. Temporalmente realista
             3. Compatible con metas existentes
-            4. Emocionalmente sostenible (sin crear estrés)
+            4. Emocionalmente sostenible según el perfil
+
+            Considera:
+            - Si risk_tolerance es low, prioriza estabilidad
+            - Si emotional_state es stressed, sugiere metas menos presionantes
 
             DECISIONES:
             - Viable → viable: true + explicación
-            - Viable con ajustes → viable: false + ajustes sugeridos
+            - Viable con ajustes → viable: false + ajustes considerando perfil
             - No viable → explicar por qué y qué hacer primero
 
             RESPONDE SOLO EN JSON:
             {{
             "viable": true|false,
             "confidence": "high|medium|low",
-            "reason": "Explicación clara y empática",
+            "reason": "Explicación clara considerando su perfil",
             "suggested_adjustments": {{
                 "target_amount": float,
                 "timeframe_months": int,
                 "monthly_contribution": float
             }},
-            "message": "Mensaje motivador",
-            "alternative_approach": "Sugerencia constructiva si no es viable"
+            "message": "Mensaje empático según estado emocional",
+            "alternative_approach": "Sugerencia alineada con su perfil de riesgo"
             }}
         """)
         
@@ -169,9 +200,11 @@ class GoalAnalyzer:
             chain = prompt | self.llm | JsonOutputParser()
             
             result = await chain.ainvoke({
+                "risk_tolerance": risk_tolerance,
+                "emotional_state": emotional_state,
                 "query": query,
                 "surplus": financial_context.get("month_surplus", 0),
-                "income_stability": "medium",  # Calcular esto idealmente
+                "income_stability": "medium",
                 "existing_goals": str(existing_goals),
                 "profile": str(semantic_profile)
             })
@@ -187,7 +220,10 @@ class GoalAnalyzer:
             }
     
     async def _track_goals(self,goals: List[Dict],financial_context: Dict,semantic_profile: Dict) -> Dict:
-        """Monitorea el progreso de las metas existentes"""
+        """
+        Monitorea el progreso de las metas existentes.
+        Usa semantic_profile para dar feedback apropiado.
+        """
         
         if not goals:
             return {
@@ -195,8 +231,15 @@ class GoalAnalyzer:
                 "goals_status": []
             }
         
+        motivation_style = semantic_profile.get("motivation_style", "balanced")
+        preferred_tone = semantic_profile.get("preferred_tone", "friendly")
+        
         prompt = ChatPromptTemplate.from_template("""
             Analiza el PROGRESO de las metas financieras del usuario.
+
+            PERFIL:
+            - Estilo motivacional: {motivation_style}
+            - Tono preferido: {preferred_tone}
 
             METAS:
             {goals}
@@ -215,10 +258,14 @@ class GoalAnalyzer:
             - behind: necesita más esfuerzo (manejable)
             - critical: requiere reevaluación
 
+            Adapta el feedback según:
+            - motivation_style: goal_oriented → enfoque en logros | stress_averse → enfoque en calma
+            - preferred_tone: friendly → casual | encouraging → motivador
+
             REGLAS:
-            - Sé alentador, no crítico
+            - Sé alentador según el estilo preferido
             - Enfócate en logros, no solo en faltantes
-            - Da feedback constructivo
+            - Da feedback constructivo adaptado al tono
 
             RESPONDE SOLO EN JSON:
             {{
@@ -231,11 +278,11 @@ class GoalAnalyzer:
                 "time_elapsed_percentage": float,
                 "projected_completion": "YYYY-MM-DD",
                 "monthly_gap": float,
-                "message": "Feedback personalizado",
-                "recommended_action": "Acción específica"
+                "message": "Feedback personalizado según estilo y tono",
+                "recommended_action": "Acción específica adaptada al perfil"
                 }}
             ],
-            "overall_message": "Mensaje general motivador",
+            "overall_message": "Mensaje general según estilo motivacional",
             "distribution_suggestion": {{
                 "total_available": float,
                 "allocations": [
@@ -261,6 +308,8 @@ class GoalAnalyzer:
                 })
             
             result = await chain.ainvoke({
+                "motivation_style": motivation_style,
+                "preferred_tone": preferred_tone,
                 "goals": str(enriched_goals),
                 "surplus": financial_context.get("month_surplus", 0)
             })
