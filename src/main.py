@@ -11,6 +11,7 @@ from src.models.schemas import (
 )
 from src.agents.financial_analyzer import FinancialAnalyzer
 from src.agents.goal_analyzer import GoalAnalyzer
+from src.agents.budget_advisor import BudgetAdvisor
 from src.memory.manager import MemoryManager
 from src.config import settings
 # Crear tablas al inicio
@@ -26,6 +27,89 @@ app = FastAPI(
 memory_manager = MemoryManager()
 financial_analyzer = FinancialAnalyzer()
 goal_analyzer = GoalAnalyzer()
+budget_advisor = BudgetAdvisor()
+from fastapi import Body
+from pydantic import BaseModel
+
+# Modelos para endpoints de presupuesto
+class BudgetSuggestInput(BaseModel):
+    user_id: str
+    category_id: int
+    start_date: str
+    end_date: str
+    transactions: Optional[list] = None
+    financial_context: Optional[dict] = None
+    semantic_profile: Optional[dict] = None
+
+class BudgetReviewInput(BaseModel):
+    user_id: str
+    budget: dict
+    transactions: Optional[list] = None
+    financial_context: Optional[dict] = None
+    semantic_profile: Optional[dict] = None
+@app.post("/budget/suggest")
+async def suggest_budget(input_data: BudgetSuggestInput, authorization: Optional[str] = Header(None)):
+    """
+    Sugiere un presupuesto para una nueva categoría.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    # Obtener datos si faltan
+    if not input_data.transactions:
+        input_data.transactions = [t.model_dump() for t in await fetch_transactions(authorization)]
+    if not input_data.financial_context:
+        summary = await fetch_financial_summary(authorization)
+        income = float(summary.get("totalIncome", 0) or 0)
+        expense = float(summary.get("totalExpense", 0) or 0)
+        input_data.financial_context = {
+            "monthly_income": income,
+            "fixed_expenses": 0,
+            "variable_expenses": expense,
+            "savings": 0,
+            "month_surplus": income - expense
+        }
+    if not input_data.semantic_profile:
+        input_data.semantic_profile = memory_manager.get_semantic_profile(input_data.user_id)
+    # Llamar agente
+    result = await budget_advisor.suggest_budget(
+        category_id=input_data.category_id,
+        transactions=input_data.transactions,
+        financial_context=input_data.financial_context,
+        semantic_profile=input_data.semantic_profile,
+        start_date=input_data.start_date,
+        end_date=input_data.end_date
+    )
+    return result
+
+@app.post("/budget/review")
+async def review_budget(input_data: BudgetReviewInput, authorization: Optional[str] = Header(None)):
+    """
+    Revisa el cumplimiento de un presupuesto existente.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    if not input_data.transactions:
+        input_data.transactions = [t.model_dump() for t in await fetch_transactions(authorization)]
+    if not input_data.financial_context:
+        summary = await fetch_financial_summary(authorization)
+        income = float(summary.get("totalIncome", 0) or 0)
+        expense = float(summary.get("totalExpense", 0) or 0)
+        input_data.financial_context = {
+            "monthly_income": income,
+            "fixed_expenses": 0,
+            "variable_expenses": expense,
+            "savings": 0,
+            "month_surplus": income - expense
+        }
+    if not input_data.semantic_profile:
+        input_data.semantic_profile = memory_manager.get_semantic_profile(input_data.user_id)
+    result = await budget_advisor.review_budget(
+        budget=input_data.budget,
+        transactions=input_data.transactions,
+        financial_context=input_data.financial_context,
+        semantic_profile=input_data.semantic_profile
+    )
+    return result
 
 @app.get("/health")
 async def health_check():
