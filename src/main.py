@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Header, HTTPException
-from typing import Optional
+from typing import Dict, Optional, Any
 import httpx
 from datetime import datetime, timezone
 from src.models.schemas import (
@@ -48,6 +48,24 @@ class BudgetReviewInput(BaseModel):
     transactions: Optional[list] = None
     financial_context: Optional[dict] = None
     semantic_profile: Optional[dict] = None
+
+class ProfileInput(BaseModel):
+    user_id: int
+    attributes: Dict[str, Any]
+
+@app.post("/profile")
+async def create_profile(input_data: ProfileInput, authorization: Optional[str] = Header(None)):
+    """Guarda el perfil semántico inicial del usuario (Onboarding)"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    # Guardar en BD
+    memory_manager.create_initial_profile(
+        user_id=input_data.user_id,
+        profile_data=input_data.attributes
+    )
+    
+    return {"status": "success", "message": "Perfil semántico creado"}
 
 @app.post("/budget/suggest")
 async def suggest_budget(input_data: BudgetSuggestInput, authorization: Optional[str] = Header(None)):
