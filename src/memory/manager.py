@@ -208,3 +208,29 @@ class MemoryManager:
             return 0
         finally:
             db.close()
+
+    def create_initial_profile(self, user_id: int, profile_data: Dict) -> None:
+        """Crea o sobrescribe el perfil semántico inicial desde el Onboarding"""
+        db = SessionLocal()
+        try:
+            # Buscar si ya existe
+            profile = db.query(SemanticProfile).filter(SemanticProfile.user_id == user_id).first()
+            
+            if profile:
+                profile.attributes = profile_data
+                profile.last_updated = datetime.now(timezone.utc)
+            else:
+                profile = SemanticProfile(
+                    user_id=user_id,
+                    attributes=profile_data,
+                    last_updated=datetime.now(timezone.utc)
+                )
+                db.add(profile)
+            
+            db.commit()
+            print(f"✅ Initial semantic profile created for user {user_id}")
+        except Exception as e:
+            print(f"❌ Error creating initial profile: {e}")
+            db.rollback()
+        finally:
+            db.close()
