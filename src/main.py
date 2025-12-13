@@ -35,6 +35,7 @@ from pydantic import BaseModel
 class BudgetSuggestInput(BaseModel):
     user_id: str
     category_id: int
+    category_name: str
     start_date: str
     end_date: str
     transactions: Optional[list] = None
@@ -47,6 +48,7 @@ class BudgetReviewInput(BaseModel):
     transactions: Optional[list] = None
     financial_context: Optional[dict] = None
     semantic_profile: Optional[dict] = None
+
 @app.post("/budget/suggest")
 async def suggest_budget(input_data: BudgetSuggestInput, authorization: Optional[str] = Header(None)):
     """
@@ -73,6 +75,7 @@ async def suggest_budget(input_data: BudgetSuggestInput, authorization: Optional
     # Llamar agente
     result = await budget_advisor.suggest_budget(
         category_id=input_data.category_id,
+        category_name=input_data.category_name,
         transactions=input_data.transactions,
         financial_context=input_data.financial_context,
         semantic_profile=input_data.semantic_profile,

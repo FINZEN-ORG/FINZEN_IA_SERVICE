@@ -20,7 +20,7 @@ class BudgetAdvisor:
         )
         self.financial_analyzer = FinancialAnalyzer()
 
-    async def suggest_budget(self, category_id: int, transactions: List[Dict], financial_context: Dict, semantic_profile: Dict, start_date: str, end_date: str) -> Dict:
+    async def suggest_budget(self, category_id: int, category_name: str, transactions: List[Dict], financial_context: Dict, semantic_profile: Dict, start_date: str, end_date: str) -> Dict:
         """
         Sugiere un monto de presupuesto para una nueva categoría.
         Devuelve monto sugerido, fechas, explicación y tip.
@@ -38,7 +38,8 @@ class BudgetAdvisor:
             El usuario está creando una nueva categoría de presupuesto.
 
             DATOS DE LA CATEGORÍA:
-            - category_id: {category_id}
+            - ID: {category_id}
+            - NOMBRE: {category_name}
             - Fecha inicio: {start_date}
             - Fecha fin: {end_date}
 
@@ -69,13 +70,15 @@ class BudgetAdvisor:
         # Filtrar transacciones de la categoría
         cat_tx = [t for t in transactions if t.get("category_id") == category_id]
         tx_text = "\n".join([
-            f"- {t.get('description', 'Sin descripción')}: ${t.get('amount', 0)} ({t.get('date', '')})" for t in cat_tx[-20:]
+            f"- {t.get('description', 'Sin descripción')}: ${t.get('amount', 0)} ({t.get('date', '')})" 
+            for t in cat_tx[-20:]
         ])
 
         try:
             chain = prompt | self.llm | JsonOutputParser()
             result = await chain.ainvoke({
                 "category_id": category_id,
+                "category_name": category_name,
                 "start_date": start_date,
                 "end_date": end_date,
                 "analysis": str(analysis),
@@ -93,7 +96,13 @@ class BudgetAdvisor:
                 "error": str(e)
             }
 
-    async def review_budget(self, budget: Dict, transactions: List[Dict], financial_context: Dict, semantic_profile: Dict) -> Dict:
+    async def review_budget(
+        self, 
+        budget: Dict, 
+        transactions: List[Dict], 
+        financial_context: Dict, 
+        semantic_profile: Dict
+    ) -> Dict:
         """
         Revisa si el presupuesto se va a cumplir antes de la fecha de fin.
         Devuelve estado, tips, análisis de transacciones y sugerencias de cambio.
@@ -106,7 +115,8 @@ class BudgetAdvisor:
         # Filtrar transacciones de la categoría y periodo
         cat_tx = [
             t for t in transactions
-            if t.get("category_id") == category_id and start_date <= t.get("date", "") <= end_date
+            if t.get("category_id") == category_id 
+            and start_date <= t.get("date", "") <= end_date
         ]
         spent = sum(t.get("amount", 0) for t in cat_tx)
         remaining = amount - spent
@@ -149,7 +159,8 @@ class BudgetAdvisor:
         """)
 
         tx_text = "\n".join([
-            f"- {t.get('description', 'Sin descripción')}: ${t.get('amount', 0)} ({t.get('date', '')})" for t in cat_tx[-20:]
+            f"- {t.get('description', 'Sin descripción')}: ${t.get('amount', 0)} ({t.get('date', '')})" 
+            for t in cat_tx[-20:]
         ])
 
         try:
